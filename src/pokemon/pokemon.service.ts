@@ -1,8 +1,12 @@
-import { Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  InternalServerErrorException,
+} from '@nestjs/common';
 import { CreatePokemonDto } from './dto/create-pokemon.dto';
 import { UpdatePokemonDto } from './dto/update-pokemon.dto';
 import { Pokemon } from './entities/pokemon.entity';
-import { Model } from 'mongoose';
+import { Model, isValidObjectId } from 'mongoose';
 import { InjectModel } from '@nestjs/mongoose';
 @Injectable()
 export class PokemonService {
@@ -13,23 +17,66 @@ export class PokemonService {
 
   async create(createPokemonDto: CreatePokemonDto) {
     createPokemonDto.name = createPokemonDto.name.toLowerCase();
-    const pokemon = await this.pokemonModel.create(createPokemonDto);
-    return pokemon;
+    try {
+      const pokemon = await this.pokemonModel.create(createPokemonDto);
+      return pokemon;
+    } catch (error) {
+      this.handleExceptions(error);
+    }
   }
 
   findAll() {
     return `This action returns all pokemon`;
   }
 
-  findOne(id: number) {
-    return `This action returns a #${id} pokemon`;
+  async findOne(term: string) {
+    let pokemon: Pokemon;
+    if (!isNaN(+term)) {
+      pokemon = await this.pokemonModel.findOne({ no: term });
+    }
+    // Mongo ID
+    if (!pokemon && isValidObjectId(term)) {
+      pokemon = await this.pokemonModel.findById(term);
+    }
+    // Name
+    if (!pokemon) {
+      pokemon = await this.pokemonModel.findOne({
+        name: term.toLowerCase().trim(),
+      });
+    }
+    if (!pokemon) {
+      throw new BadRequestException(`Pokemon not found with id_ ${term}`);
+    }
+    return pokemon;
   }
 
-  update(id: number, updatePokemonDto: UpdatePokemonDto) {
-    return `This action updates a #${id} pokemon with ${JSON.stringify(updatePokemonDto)}`;
+  async update(term: string, updatePokemonDto: UpdatePokemonDto) {
+    const pokemon = await this.findOne(term);
+    if (updatePokemonDto.name) {
+      updatePokemonDto.name = updatePokemonDto.name.toLowerCase();
+    }
+    try {
+      await pokemon.updateOne(updatePokemonDto);
+      return { ...pokemon.toJSON(), ...updatePokemonDto };
+    } catch (error) {
+      this.handleExceptions(error);
+    }
   }
 
-  remove(id: number) {
-    return `This action removes a #${id} pokemon`;
+  async remove(id: string) {
+    const pokemon = await this.findOne(id);
+    await pokemon.deleteOne();
+    return `This pokemon was deleted #${id}`;
+  }
+
+  // Functions
+  private handleExceptions(error: any) {
+    if (error.code === 11000) {
+      throw new BadRequestException(
+        `Pokemon already exists ${JSON.stringify(error.keyValue)}`,
+      );
+    }
+    console.log(error);
+    throw new InternalServerErrorException(`Can't create pokemon ${error}`);
   }
 }
