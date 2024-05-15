@@ -54,7 +54,7 @@ $ docker-compose up -d
 npm run start:dev
 ```
 
-6. Reconstruir la base de datos con la semilla (seed)
+8. Reconstruir la base de datos con la semilla (seed)
 ```
 http://localhost:3000/api/v2/seed
 ```
@@ -62,3 +62,12 @@ http://localhost:3000/api/v2/seed
 ## Stack usado
 * MongoDB
 * Nest
+
+
+# Production build
+1. crear el archivo ```.env.prod````
+2. llenar las variables de entorno de prod
+3. crar la nueva imagen
+```
+docker-compose -f docker-compose.prod.yaml --env-file .env.prod up --build
+```
